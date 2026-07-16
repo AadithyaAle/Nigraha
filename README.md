@@ -24,8 +24,8 @@ StackSentinel is a local Linux repair assistant that watches logs, suggests safe
 Clone the repo and run:
 
 ```bash
-git clone <your-repo-url> NIgraha
-cd NIgraha
+git clone https://github.com/AadithyaAle/Nigraha Nigraha
+cd Nigraha
 sudo ./install.sh
 ```
 
