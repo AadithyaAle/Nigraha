@@ -1,43 +1,62 @@
-import hashlib
-import json
-import os
+import base64
 import getpass
+import hashlib
+import hmac
+import secrets
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt
+
+from app_paths import SECRET_FILE, atomic_write_json, read_json
 
 console = Console()
-SECRET_FILE = "secret.json"
+PBKDF2_ROUNDS = 200_000
 
-def get_password_hash(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_password_hash(password, salt):
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)
+
 
 def set_password():
-    console.print(Panel("🆕 [bold green]First Run: Setup Security[/bold green]\nCreate a password to lock your Sentinel.", border_style="green"))
+    console.print(
+        Panel(
+            "🆕 [bold green]First Run: Setup Security[/bold green]\nCreate a password to lock your Sentinel.",
+            border_style="green",
+        )
+    )
     while True:
         p1 = getpass.getpass("Enter New Password: ")
         p2 = getpass.getpass("Confirm Password: ")
         if p1 == p2 and p1.strip():
-            with open(SECRET_FILE, "w") as f:
-                json.dump({"hash": get_password_hash(p1)}, f)
+            salt = secrets.token_bytes(16)
+            atomic_write_json(
+                SECRET_FILE,
+                {
+                    "salt": base64.b64encode(salt).decode("utf-8"),
+                    "hash": base64.b64encode(get_password_hash(p1, salt)).decode(
+                        "utf-8"
+                    ),
+                },
+            )
             console.print("[bold green]✅ Password Set![/bold green]")
             return
         console.print("[red]Passwords do not match. Try again.[/red]")
 
+
 def verify_access():
-    if not os.path.exists(SECRET_FILE):
+    stored = read_json(SECRET_FILE, None)
+    if not stored or "salt" not in stored or "hash" not in stored:
         set_password()
         return True
 
-    with open(SECRET_FILE, "r") as f:
-        stored_hash = json.load(f)["hash"]
-
     console.print("[bold yellow]🔒 Security Check Required[/bold yellow]")
     attempt = getpass.getpass("Enter Admin Password: ")
-    
-    if get_password_hash(attempt) == stored_hash:
+    salt = base64.b64decode(stored["salt"])
+    stored_hash = base64.b64decode(stored["hash"])
+
+    if hmac.compare_digest(get_password_hash(attempt, salt), stored_hash):
         console.print("[green]🔓 Access Granted[/green]")
         return True
-    else:
-        console.print("[bold red]⛔ ACCESS DENIED[/bold red]")
-        return False
+
+    console.print("[bold red]⛔ ACCESS DENIED[/bold red]")
+    return False

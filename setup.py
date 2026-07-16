@@ -1,30 +1,40 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
-    name='stacksentinel',
-    version='1.0.0',
-    packages=find_packages(),
+    name="stacksentinel",
+    version="1.1.0",
     py_modules=[
-        'main', 'diagnose', 'brain', 'history', 'gym', 
-        'sentinel_profile', 'guard', 'auth', 'snapshot', 
-        'cloud', 'hooks_engine', 'drift', 'notifier', 'voice', 'server'
+        "app_paths",
+        "auth",
+        "brain",
+        "cloud",
+        "diagnose",
+        "drift",
+        "guard",
+        "history",
+        "hooks_engine",
+        "main",
+        "notifier",
+        "sentinel_profile",
+        "server",
+        "snapshot",
+        "voice",
+        "gym",
     ],
     install_requires=[
-        'boto3',
-        'psutil',
-        'flask',
-        'rich',
-        'pyttsx3',
-        'pyngrok',
-        'distro',
-        'GPUtil',
+        "openai",
+        "psutil",
+        "flask",
+        "rich",
+        "distro",
+        "GPUtil",
     ],
     entry_points={
-        'console_scripts': [
-            'stacksentinel=main:cli_entry_point',
-            'stacksentinel-ui=server:start_server',
+        "console_scripts": [
+            "stacksentinel=main:cli_entry_point",
+            "stacksentinel-ui=server:start_server",
         ],
     },
-    author='Aadithya Ale',
-    description='An Autonomous AI Infrastructure Agent',
+    author="Aadithya Ale",
+    description="A local Linux repair assistant powered by OpenAI",
 )

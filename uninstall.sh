@@ -1,12 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
 echo "🗑️ Uninstalling StackSentinel..."
-
-# Remove the global symlinks
-sudo rm -f /usr/local/bin/stacksentinel
-sudo rm -f /usr/local/bin/stacksentinel-ui
-
-# Remove the virtual environment
-rm -rf venv
-
-echo "✅ Virtual environment and global CLI links safely removed."
+sudo python3 -m pip uninstall -y stacksentinel --break-system-packages || true
+echo "✅ Global StackSentinel package removed."

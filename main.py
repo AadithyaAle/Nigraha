@@ -1,89 +1,119 @@
-import sys
 import argparse
-import time
-import re
-import os
-import psutil
 import json
+import os
+import re
+import shlex
 import subprocess
+import sys
+import time
+from pathlib import Path
+
+import psutil
 from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown
-from rich.prompt import Confirm, Prompt
 from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-# --- MODULE IMPORTS ---
-import diagnose
-import brain 
-import history
-import gym
-import sentinel_profile as profiler
-import guard
-import auth 
-import snapshot
+import auth
+import brain
 import cloud
-import hooks_engine
+import diagnose
 import drift
+import guard
+import history
+import hooks_engine
 import notifier
+import sentinel_profile as profiler
+import snapshot
 import voice
+from app_paths import (
+    DEFAULT_LOG_FILE,
+    LOCKDOWN_FILE,
+    STATUS_FILE,
+    atomic_write_json,
+    ensure_app_dirs,
+)
 
 console = Console()
-STATUS_FILE = "/tmp/stacksentinel_status.json"
-LOCKDOWN_FILE = "/tmp/stacksentinel_lockdown.mode"
 
-# --- HELPER FUNCTIONS ---
+
 def extract_commands(text):
     commands = {}
-    backup_match = re.search(r"\*\*Backup Command:\*\*\s*```bash\s+(.*?)\s+```", text, re.DOTALL)
-    if backup_match: commands['backup'] = backup_match.group(1).strip()
-    
+    backup_match = re.search(
+        r"\*\*Backup Command:\*\*\s*```bash\s+(.*?)\s+```", text, re.DOTALL
+    )
+    if backup_match:
+        commands["backup"] = backup_match.group(1).strip()
+
     fix_match = re.search(r"(?:Suggested Fix:|Fix:).*?```bash\s+(.*?)\s+```", text, re.DOTALL)
-    if fix_match: commands['fix'] = fix_match.group(1).strip()
+    if fix_match:
+        commands["fix"] = fix_match.group(1).strip()
     elif "```bash" in text:
         all_matches = re.findall(r"```bash\s+(.*?)\s+```", text, re.DOTALL)
-        if all_matches: commands['fix'] = all_matches[-1].strip()
+        if all_matches:
+            commands["fix"] = all_matches[-1].strip()
     return commands
 
+
 def broadcast_status(status, cpu, ram, last_log):
-    """Writes system state atomically so the Flask server never crashes reading it."""
     try:
-        data = {
-            "cpu": cpu,
-            "ram": ram,
-            "status": status,
-            "last_log": last_log[:150]
-        }
-        temp_path = STATUS_FILE + ".tmp"
-        with open(temp_path, "w") as f:
-            json.dump(data, f)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_path, STATUS_FILE)
-        os.chmod(STATUS_FILE, 0o666)
+        atomic_write_json(
+            STATUS_FILE,
+            {
+                "cpu": cpu,
+                "ram": ram,
+                "status": status,
+                "last_log": last_log[:150],
+            },
+            mode=0o600,
+        )
     except Exception:
         pass
 
-# --- WATCHDOG MODE (FULL FEATURED) ---
-# Change line 67 to this:
-def start_watchdog_mode(log_file="/tmp/stacksentinel_dummy_log.txt"):
+
+def ensure_log_file(log_file):
+    path = Path(log_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text("--- Watchdog Log Started ---\n", encoding="utf-8")
+    return path
+
+
+def cleanup_status_file():
+    if STATUS_FILE.exists():
+        STATUS_FILE.unlink()
+
+
+def run_fix_command(command):
+    result = subprocess.run(
+        shlex.split(command),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    return result
+
+
+def start_watchdog_mode(log_file=str(DEFAULT_LOG_FILE)):
+    ensure_app_dirs()
     console.clear()
     console.rule("[bold red]🛡️ StackSentinel WATCHDOG PROTOCOL: ACTIVE[/bold red]")
-    console.print(Panel(
-        "I am guarding your system while you are away.\n"
-        "Monitoring: [cyan]Logs[/cyan] | [cyan]CPU/RAM[/cyan] | [cyan]Process Whitelist[/cyan]\n"
-        "Status: [bold green]ARMED[/bold green]",
-        title="AFK Protection",
-        border_style="red"
-    ))
-    
-    if not os.path.exists(log_file):
-        with open(log_file, "w") as f:
-            f.write("--- Watchdog Log Started ---\n")
+    console.print(
+        Panel(
+            "I am guarding your system while you are away.\n"
+            "Monitoring: [cyan]Logs[/cyan] | [cyan]CPU/RAM[/cyan] | [cyan]Process Guard[/cyan]\n"
+            "Status: [bold green]ARMED[/bold green]",
+            title="AFK Protection",
+            border_style="red",
+        )
+    )
 
-    # Startup Sequence
+    log_path = ensure_log_file(log_file)
     notifier.send_startup_ping()
-    voice.speak("Watchdog Protocol Initiated. System Armed.")
+    voice.speak("Watchdog protocol initiated. System armed.")
 
     last_processed_line = ""
     tick_counter = 0
@@ -91,255 +121,327 @@ def start_watchdog_mode(log_file="/tmp/stacksentinel_dummy_log.txt"):
     current_ai_log = "Monitoring system logs..."
 
     with Live(refresh_per_second=1) as live:
-        with open(log_file, "r") as f:
-            f.seek(0, 2)
+        with open(log_path, "r", encoding="utf-8") as handle:
+            handle.seek(0, os.SEEK_END)
             while True:
-                # 1. Fetch Vitals ONCE to fix the psutil double-call bug
                 current_cpu = psutil.cpu_percent(interval=None)
                 current_ram = psutil.virtual_memory().percent
-                
-                # --- CHECK FOR REMOTE LOCKDOWN ---
-                is_locked = os.path.exists(LOCKDOWN_FILE)
-                
-                # Edge Trigger: Lockdown Started
+                is_locked = LOCKDOWN_FILE.exists()
+
                 if is_locked and not was_locked:
-                    voice.speak("Lockdown Protocol Engaged. Eliminating threats.")
+                    voice.speak("Lockdown protocol engaged. Eliminating threats.")
                     console.print("[bold red]🔒 LOCKDOWN ACTIVATED REMOTELY[/bold red]")
-                    notifier.send_alert("System Status", "Lockdown Protocol Engaged via Remote.", "critical")
-                
-                # Edge Trigger: Lockdown Ended
+                    notifier.send_alert(
+                        "System Status",
+                        "Lockdown protocol engaged via remote control.",
+                        "critical",
+                    )
                 elif not is_locked and was_locked:
                     voice.speak("Lockdown disengaged. Returning to standard watch.")
                     console.print("[green]🔓 Lockdown lifted.[/green]")
-                    notifier.send_alert("System Status", "Lockdown Disengaged.", "normal")
-                
+                    notifier.send_alert("System Status", "Lockdown disengaged.", "normal")
+
                 was_locked = is_locked
 
-                # 2. Update the Rich Table GUI
                 table = Table(title="System Vitals")
-                table.add_column("Metric", style="cyan"); table.add_column("Value", style="green")
+                table.add_column("Metric", style="cyan")
+                table.add_column("Value", style="green")
                 table.add_row("CPU Usage", f"{current_cpu}%")
                 table.add_row("RAM Usage", f"{current_ram}%")
-                table.add_row("Mode", "[bold red]🔒 LOCKDOWN[/bold red]" if is_locked else "[green]Standard[/green]")
+                table.add_row(
+                    "Mode",
+                    "[bold red]🔒 LOCKDOWN[/bold red]" if is_locked else "[green]Standard[/green]",
+                )
                 status = "[green]NORMAL[/green]"
-                if current_cpu > 90: status = "[red]HIGH LOAD[/red]"
+                if current_cpu > 90:
+                    status = "[red]HIGH LOAD[/red]"
                 table.add_row("Status", status)
                 live.update(table)
 
-                # --- GUARD CHECK ---
                 check_freq = 1 if is_locked else 5
-                
                 if tick_counter % check_freq == 0:
-                     rogues = guard.check_processes()
-                     if rogues: 
-                         # guard.enforce_rules(rogues) # Temporarily disabled to prevent Ubuntu GDM crashes
-                         #console.print(f"[yellow]Safe Mode: guard.py wants to kill -> {rogues}[/yellow]")
-                         pass
-                
-                # --- REMOTE BROADCAST ---
+                    rogues = guard.check_processes()
+                    if rogues:
+                        guard.enforce_rules(rogues)
+
                 if tick_counter % 2 == 0:
                     status_text = "🔒 LOCKDOWN" if is_locked else "ARMED"
                     broadcast_status(status_text, current_cpu, current_ram, current_ai_log)
 
-                # --- LOG ANALYSIS ---
-                line = f.readline()
+                line = handle.readline()
                 if line and ("ERROR" in line or "CRITICAL" in line):
-                    if line.strip() == last_processed_line:
+                    stripped = line.strip()
+                    if stripped == last_processed_line:
                         time.sleep(0.1)
-                        continue 
-                    
-                    last_processed_line = line.strip()
-                    current_ai_log = line.strip() # Keeps the error visible on your phone!
+                        continue
 
-                    live.stop() 
-                    
-                    if hasattr(history, 'is_system_looping') and history.is_system_looping(line):
-                        msg = "Circuit Breaker Triggered."
+                    last_processed_line = stripped
+                    current_ai_log = stripped
+                    live.stop()
+
+                    if history.is_system_looping(stripped):
+                        msg = "Circuit breaker triggered."
                         console.print(Panel(f"[bold red]🛑 {msg}[/bold red]", border_style="red"))
                         voice.speak(msg)
                         notifier.send_alert("Circuit Breaker", msg, "critical")
-                        current_ai_log = "HALTED: Circuit Breaker Active"
+                        current_ai_log = "HALTED: Circuit breaker active"
                         broadcast_status("HALTED", current_cpu, current_ram, current_ai_log)
                         input("Press Enter to reset...")
                         live.start()
                         continue
 
-                    # Alerting Sequence
                     broadcast_status("CRITICAL ALERT", current_cpu, current_ram, current_ai_log)
-                    notifier.send_alert("StackSentinel Alert", line.strip(), "critical")
-                    voice.speak(f"Critical Alert. Error Detected.")
-                    console.print(Panel(f"[bold red]🚨 THREAT DETECTED:[/bold red] {line.strip()}", border_style="red"))
-                    
-                    console.print("[yellow]🧠 Consulting Amazon Nova AI...[/yellow]")
+                    notifier.send_alert("StackSentinel Alert", stripped, "critical")
+                    voice.speak("Critical alert. Error detected.")
+                    console.print(
+                        Panel(
+                            f"[bold red]🚨 THREAT DETECTED:[/bold red] {stripped}",
+                            border_style="red",
+                        )
+                    )
+
+                    console.print("[yellow]🧠 Consulting OpenAI diagnosis...[/yellow]")
                     sys_ctx = diagnose.get_system_report()
-                    solution = brain.ask_nova(sys_ctx, f"CRITICAL: {line}", learning_mode=False)
+                    solution = brain.ask_openai(sys_ctx, f"CRITICAL: {stripped}")
                     cmds = extract_commands(solution)
-                    fix = cmds.get('fix')
-                    
-                    if fix and "SAFE" in brain.audit_command(fix):
-                        console.print(f"[bold green]✅ Auto-Fixing...[/bold green]")
-                        #voice.speak("Applying Automated Fix.")
-                        
-                        # --- THE MAGIC MOMENT: Execution ---
+                    fix = cmds.get("fix")
+
+                    if fix and brain.audit_command(fix) == "SAFE":
+                        console.print("[bold green]✅ Auto-fixing...[/bold green]")
                         try:
-                            # Added timeout=15 so the AI can never permanently freeze the watchdog
-                            subprocess.run(fix, shell=True, check=False, timeout=15)
-                            console.print(f"[bold cyan]Command Executed: {fix}[/bold cyan]")
+                            result = run_fix_command(fix)
+                            if result.returncode == 0:
+                                console.print(f"[bold cyan]Command Executed: {fix}[/bold cyan]")
+                                history_status = "AUTO_EXECUTED"
+                                current_ai_log = f"✅ FIXED: {fix}"
+                            else:
+                                console.print(
+                                    f"[bold red]Command failed ({result.returncode}).[/bold red]\n{result.stderr}"
+                                )
+                                history_status = "FAILED"
+                                current_ai_log = f"❌ FAILED: {fix}"
                         except subprocess.TimeoutExpired:
-                            console.print(f"[bold red]Execution Aborted: Command took too long or asked for input.[/bold red]")
-                        except Exception as e:
-                            console.print(f"[red]Execution failed: {e}[/red]")
-                            
-                        history.save_event(f"AFK: {line}", solution, fix, None, "SAFE", "AUTO_EXECUTED")
-                        current_ai_log = f"✅ FIXED: {fix}" # Sends success message to your phone
+                            console.print(
+                                "[bold red]Execution aborted: command took too long or asked for input.[/bold red]"
+                            )
+                            history_status = "TIMEOUT"
+                            current_ai_log = "❌ FAILED: Command timed out."
+
+                        history.save_event(
+                            f"AFK: {stripped}",
+                            solution,
+                            fix,
+                            cmds.get("backup"),
+                            "SAFE",
+                            history_status,
+                        )
                     else:
-                        console.print(f"[bold red]🛑 Dangerous Fix Blocked.[/bold red]")
-                        voice.speak("Fix blocked by Safety Protocols.")
-                        history.save_event(f"AFK: {line}", solution, fix, None, "BLOCKED", "BLOCKED")
+                        console.print("[bold red]🛑 Dangerous fix blocked.[/bold red]")
+                        voice.speak("Fix blocked by safety protocols.")
+                        history.save_event(
+                            f"AFK: {stripped}",
+                            solution,
+                            fix,
+                            cmds.get("backup"),
+                            "BLOCKED",
+                            "BLOCKED",
+                        )
                         current_ai_log = "🛑 BLOCKED: Unsafe command detected."
-                    
+
                     time.sleep(2)
                     live.start()
-                
-                # --- HEARTBEAT SLEEP ---
+
                 time.sleep(1.0)
                 tick_counter += 1
 
-# --- WATCH MODE (PASSIVE) ---
-def start_watch_mode(log_file="system_log.txt"):
+
+def start_watch_mode(log_file=str(DEFAULT_LOG_FILE)):
+    ensure_app_dirs()
     console.clear()
     console.rule("[bold blue]StackSentinel: WATCH MODE ACTIVE[/bold blue]")
-    
-    if not os.path.exists(log_file):
-        with open(log_file, "w") as f:
-            f.write("---\n")
-            
-    with open(log_file, "r") as f:
-        f.seek(0, 2)
+    log_path = ensure_log_file(log_file)
+    with open(log_path, "r", encoding="utf-8") as handle:
+        handle.seek(0, os.SEEK_END)
         while True:
-            line = f.readline()
-            if line: console.print(f"[dim]{line.strip()}[/dim]")
+            line = handle.readline()
+            if line:
+                console.print(f"[dim]{line.strip()}[/dim]")
             time.sleep(0.5)
 
-# --- MAIN EXECUTION ---
+
 def cli_entry_point():
     parser = argparse.ArgumentParser()
     parser.add_argument("problem", type=str, nargs="?", help="Describe your problem")
     parser.add_argument("--image", type=str, default=None)
-    parser.add_argument("--learn", action="store_true", help="Enable Educational Mode")
-    parser.add_argument("--history", action="store_true", help="View Audit Logs")
-    parser.add_argument("--gym", action="store_true", help="Enter Training Simulator")
+    parser.add_argument("--learn", action="store_true", help="Enable educational mode")
+    parser.add_argument("--history", action="store_true", help="View audit logs")
+    parser.add_argument("--gym", action="store_true", help="Enter training simulator")
     parser.add_argument("--watch", action="store_true", help="Monitor logs")
-    parser.add_argument("--watchdog", action="store_true", help="AFK Protection Mode")
-    parser.add_argument("--report", action="store_true", help="Show Performance Score")
+    parser.add_argument("--watchdog", action="store_true", help="AFK protection mode")
+    parser.add_argument("--report", action="store_true", help="Show performance score")
     parser.add_argument("--teach", action="store_true", help="Correct AI mistakes")
-    parser.add_argument("--snapshot", action="store_true", help="Create Restore Point")
-    parser.add_argument("--restore", action="store_true", help="Restore from Snapshot")
-    parser.add_argument("--audit", action="store_true", help="Check for System Drift")
-    parser.add_argument("--set-baseline", action="store_true", help="Set Drift Baseline")
+    parser.add_argument("--snapshot", action="store_true", help="Create restore point")
+    parser.add_argument("--restore", action="store_true", help="Restore from snapshot")
+    parser.add_argument("--audit", action="store_true", help="Check for system drift")
+    parser.add_argument("--set-baseline", action="store_true", help="Set drift baseline")
     args = parser.parse_args()
 
+    if args.image:
+        console.print("[yellow]Image diagnosis is not implemented yet.[/yellow]")
+
     if args.watchdog or args.teach or args.history or args.report or args.restore or args.set_baseline:
-        if not auth.verify_access(): return
+        if not auth.verify_access():
+            return
 
     if args.snapshot:
         note = Prompt.ask("Enter a note", default="Manual Backup")
-        snapshot.create_snapshot(note); return
+        snapshot.create_snapshot(note)
+        return
 
     if args.restore:
         backups = snapshot.list_snapshots()
-        if not backups: return
+        if not backups:
+            return
         table = Table(title="Restore Points")
-        table.add_column("ID", style="cyan"); table.add_column("File"); table.add_column("Note")
-        for idx, b in enumerate(backups): table.add_row(str(idx), b['file'], b['note'])
+        table.add_column("ID", style="cyan")
+        table.add_column("File")
+        table.add_column("Note")
+        for idx, backup in enumerate(backups):
+            table.add_row(str(idx), backup["file"], backup["note"])
         console.print(table)
         choice = Prompt.ask("ID to restore (or 'q')", default="q")
-        if choice == 'q': return
-        try: snapshot.restore_snapshot(backups[int(choice)]['file'])
-        except: console.print("[red]Invalid ID[/red]")
+        if choice == "q":
+            return
+        try:
+            snapshot.restore_snapshot(backups[int(choice)]["file"])
+        except Exception:
+            console.print("[red]Invalid ID[/red]")
         return
 
-    if args.watchdog: start_watchdog_mode(); return
-    if args.report: console.print(history.generate_report()); return
-    if args.teach: history.enter_teach_mode(); return
-    if args.gym: gym.start_gym(); return
-    if args.history: history.view_history(); return
-    if args.set_baseline: drift.set_baseline(); return
-    if args.audit: drift.run_audit(); return
+    if args.watchdog:
+        start_watchdog_mode()
+        return
+    if args.watch:
+        start_watch_mode()
+        return
+    if args.report:
+        console.print(history.generate_report())
+        return
+    if args.teach:
+        history.enter_teach_mode()
+        return
+    if args.gym:
+        import gym
+
+        gym.start_gym()
+        return
+    if args.history:
+        history.view_history()
+        return
+    if args.set_baseline:
+        drift.set_baseline()
+        return
+    if args.audit:
+        drift.run_audit()
+        return
 
     if not args.problem:
         console.print("[red]Please provide a problem or flag.[/red]")
         return
 
-    if hooks_engine.check_and_run_hooks(args.problem):
-        console.print("[bold green]✅ Automated Hook Executed.[/bold green]")
-        if not Confirm.ask("Did that fix it?"): return
+    hook_result = hooks_engine.check_and_run_hooks(args.problem)
+    if hook_result.get("executed"):
+        if hook_result.get("success") and Confirm.ask("Did that hook fix it?", default=True):
+            history.save_event(
+                args.problem,
+                f"Hook executed: {hook_result.get('script')}",
+                hook_result.get("script"),
+                None,
+                "SAFE",
+                "HOOK_EXECUTED",
+            )
+            return
+        console.print("[yellow]Continuing with AI diagnosis.[/yellow]")
 
     profile = profiler.load_profile() or profiler.create_profile()
     last = history.check_recurrence(args.problem)
-    if last and last.get("user_feedback") and Confirm.ask(f"Use trusted fix: {last['user_feedback']}?"):
-        console.print("[green]Executed.[/green]"); return
+    if last and last.get("user_feedback") and Confirm.ask(
+        f"Use trusted fix: {last['user_feedback']}?", default=True
+    ):
+        audit = brain.audit_command(last["user_feedback"])
+        if audit == "SAFE":
+            result = run_fix_command(last["user_feedback"])
+            status = "EXECUTED" if result.returncode == 0 else "FAILED"
+            history.save_event(
+                args.problem,
+                "Trusted fix reused from history.",
+                last["user_feedback"],
+                None,
+                "SAFE",
+                status,
+            )
+            console.print("[green]Trusted fix executed.[/green]" if status == "EXECUTED" else "[red]Trusted fix failed.[/red]")
+            return
+        console.print(f"[red]{audit}[/red]")
 
-    with console.status("[bold purple]Consulting Amazon Nova AI...[/bold purple]"):
+    with console.status("[bold purple]Consulting OpenAI diagnosis...[/bold purple]"):
         ctx = diagnose.get_system_report()
-        sol = brain.ask_nova(ctx, args.problem, learning_mode=args.learn, user_profile=profile)
+        sol = brain.ask_openai(ctx, args.problem, learning_mode=args.learn, user_profile=profile)
 
     if args.learn:
         console.print(Panel(Markdown(sol), title="Professor Mode"))
-        if not Confirm.ask("Show Answer?"): return
-        sol = brain.ask_nova(ctx, args.problem, learning_mode=False)
+        if not Confirm.ask("Show direct fix recommendation?", default=True):
+            history.save_event(args.problem, sol, None, None, "N/A", "LEARN_ONLY")
+            return
+        sol = brain.ask_openai(ctx, args.problem, learning_mode=False, user_profile=profile)
 
     console.print(Panel(Markdown(sol), title="Diagnosis"))
     cmds = extract_commands(sol)
     status = "NO_ACTION"
     auditor = "N/A"
-    
-    if cmds.get('fix'):
-        audit = brain.audit_command(cmds['fix'])
-        auditor = "SAFE" if "SAFE" in audit else "WARNING"
+
+    if cmds.get("fix"):
+        audit = brain.audit_command(cmds["fix"])
+        auditor = "SAFE" if audit == "SAFE" else "WARNING"
         if auditor == "SAFE":
-            console.print(f"[bold green]✅ Auditor Approved[/bold green]")
-            if Confirm.ask("Run this plan?"):
-                if cmds.get('backup'): console.print("[blue]Backing up...[/blue]")
-                # Direct Terminal Execution Logic
-                fix_command = cmds['fix']
-                dangerous_keywords = ["rm -rf", "mkfs", "dd ", "reboot", "shutdown", "chmod 777", "mkswap"]
-                
-                if any(bad_word in fix_command for bad_word in dangerous_keywords):
-                    console.print(f"[bold red]SECURITY ALERT: AI attempted to run a destructive command:[/bold red] {fix_command}")
-                    console.print("[bold red]Execution BLOCKED to protect the kernel.[/bold red]")
-                    status = "BLOCKED_BY_SAFETY_NET"
-                else:
-                    # Added a 15-second timeout so the AI can't freeze your terminal forever
-                    try:
-                        subprocess.run(fix_command, shell=True, check=False, timeout=15)
+            console.print("[bold green]✅ Auditor approved[/bold green]")
+            if Confirm.ask("Run this plan?", default=False):
+                if cmds.get("backup"):
+                    console.print(f"[blue]Backup command available:[/blue] {cmds['backup']}")
+                try:
+                    result = run_fix_command(cmds["fix"])
+                    if result.returncode == 0:
                         console.print("[green]Executed.[/green]")
                         status = "EXECUTED"
-                    except subprocess.TimeoutExpired:
-                        console.print("[bold red]Execution Aborted: Command took too long or asked for input.[/bold red]")
-                        status = "TIMEOUT"
-
-            else: status = "SKIPPED"
+                    else:
+                        console.print(
+                            Panel(
+                                (result.stderr or result.stdout or "Unknown command failure.").strip(),
+                                title=f"Command failed ({result.returncode})",
+                                border_style="red",
+                            )
+                        )
+                        status = "FAILED"
+                except subprocess.TimeoutExpired:
+                    console.print(
+                        "[bold red]Execution aborted: command took too long or asked for input.[/bold red]"
+                    )
+                    status = "TIMEOUT"
+            else:
+                status = "SKIPPED"
         else:
             console.print(Panel(f"[bold red]BLOCKED[/bold red] {audit}", border_style="red"))
             status = "BLOCKED"
 
-    history.save_event(args.problem, sol, cmds.get('fix'), cmds.get('backup'), auditor, status)
-    with console.status("[bold blue]Syncing to AWS Cloud...[/bold blue]"):
+    history.save_event(args.problem, sol, cmds.get("fix"), cmds.get("backup"), auditor, status)
+    with console.status("[bold blue]Saving latest event...[/bold blue]"):
         cloud.push_to_cloud()
+
 
 if __name__ == "__main__":
     try:
-        # This is the crucial line that actually starts the app!
         cli_entry_point()
-        
     except KeyboardInterrupt:
-        # This catches the Ctrl+C button press!
-        print("\n🛑 StackSentinel Watchdog disarmed. Shutting down gracefully...")
-        
-        # Clean up the status file so the UI knows we are offline
-
-        if os.path.exists("/tmp/stacksentinel_status.json"):
-            os.remove("/tmp/stacksentinel_status.json")
-            
+        print("\n🛑 StackSentinel disarmed. Shutting down gracefully...")
+        cleanup_status_file()
         sys.exit(0)

@@ -1,0 +1,6 @@
+openai
+psutil
+flask
+rich
+distro
+GPUtil
