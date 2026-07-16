@@ -1,0 +1,19 @@
+{
+  "output": {
+    "filePath": "repomha-payload.txt",
+    "style": "xml",
+    "removeComments": true,
+    "removeEmptyLines": true,
+    "compress": true,
+    "copyToClipboard": false
+  },
+  "ignore": {
+    "customPatterns": [
+      "*.log",
+      "tests/**",
+      "node_modules/**",
+      "*.bin",
+      "repomha-payload.txt"
+    ]
+  }
+}

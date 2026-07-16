@@ -1,0 +1,656 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where comments have been removed, empty lines have been removed, content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: *.log, tests/**, node_modules/**, *.bin, *.log, tests/**, node_modules/**, *.bin
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Code comments have been removed from supported file types
+- Empty lines have been removed from all files
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+hooks/
+  wifi_fix.sh
+auth.py
+brain.py
+chaos.py
+cloud.py
+diagnose.py
+drift.py
+guard.py
+gym.py
+history.py
+hooks_engine.py
+install.sh
+main.py
+README.md
+repomix.config.json
+sentinel_profile.py
+server.py
+setup.py
+snapshot.py
+test_voice.py
+uninstall.sh
+voice.py
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="hooks/wifi_fix.sh">
+echo "🔄 Running Custom WiFi Reset Hook..."
+nmcli radio wifi off
+sleep 1
+nmcli radio wifi on
+echo "✅ WiFi Reset Complete."
+</file>
+
+<file path="auth.py">
+console = Console()
+SECRET_FILE = "secret.json"
+⋮----
+def get_password_hash(password)
+⋮----
+def set_password()
+⋮----
+p1 = getpass.getpass("Enter New Password: ")
+p2 = getpass.getpass("Confirm Password: ")
+⋮----
+def verify_access()
+⋮----
+stored_hash = json.load(f)["hash"]
+⋮----
+attempt = getpass.getpass("Enter Admin Password: ")
+</file>
+
+<file path="brain.py">
+console = Console()
+⋮----
+def ask_nova(system_context, user_problem, learning_mode=False, user_profile=None)
+⋮----
+session = boto3.Session(profile_name="Stack-Sentinel")
+⋮----
+client = boto3.client('bedrock-runtime', region_name='us-east-1')
+⋮----
+system_prompt = f"You are StackSentinel, an AI Linux Repair Agent. System Context: {json.dumps(system_context)}"
+⋮----
+system_instruction = [{"text": system_prompt}]
+⋮----
+user_message = f"""
+⋮----
+messages = [
+⋮----
+response = client.converse(
+⋮----
+def _mock_fallback(problem)
+⋮----
+"""Failsafe so your demo never crashes without internet."""
+problem_lower = problem.lower()
+⋮----
+def audit_command(command)
+⋮----
+dangerous = ["rm -rf /*", "mkfs", ":(){ :|:& };:", "dd if=/dev/zero"]
+</file>
+
+<file path="chaos.py">
+LOG_FILE = "system_log.txt"
+⋮----
+ERRORS = [
+⋮----
+# Pick a random disaster
+disaster = random.choice(ERRORS)
+⋮----
+timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+log_entry = f"[{timestamp}] {disaster}\n"
+⋮----
+# Wait randomly between 5 to 10 seconds (so StackSentinel has time to react)
+</file>
+
+<file path="cloud.py">
+console = Console()
+LOG_GROUP = "StackSentinel-Logs"
+STREAM_NAME = "Laptop-G15-Agent"
+⋮----
+def push_to_cloud()
+⋮----
+session = boto3.Session(profile_name="Stack-Sentinel")
+credentials = session.get_credentials()
+⋮----
+client = boto3.client('bedrock-runtime', region_name='us-east-1')
+⋮----
+data = json.load(f)
+⋮----
+latest_entry = data[-1]
+⋮----
+log_event = {
+</file>
+
+<file path="diagnose.py">
+LINUX_DISTRO = distro.name(pretty=True)
+⋮----
+LINUX_DISTRO = "Linux (Unknown Distro)"
+⋮----
+HAS_GPU = True
+⋮----
+HAS_GPU = False
+⋮----
+def get_system_report()
+⋮----
+os_info = {
+⋮----
+hardware = {
+⋮----
+gpu_info = []
+⋮----
+gpus = GPUtil.getGPUs()
+⋮----
+tools = {
+⋮----
+report = {
+</file>
+
+<file path="drift.py">
+console = Console()
+BASELINE_FILE = "system_baseline.json"
+⋮----
+def get_current_state()
+⋮----
+def set_baseline()
+⋮----
+state = get_current_state()
+⋮----
+def run_audit()
+⋮----
+baseline = json.load(f)
+⋮----
+current = get_current_state()
+issues = []
+⋮----
+table = Table(title="System Drift Audit")
+⋮----
+ram_gb_base = baseline['total_ram'] // (1024**3)
+ram_gb_curr = current['total_ram'] // (1024**3)
+⋮----
+status = "[red]HARDWARE CHANGE[/red]"
+⋮----
+status = "[green]OK[/green]"
+⋮----
+disk_gb_base = baseline['disk_used'] // (1024**3)
+disk_gb_curr = current['disk_used'] // (1024**3)
+⋮----
+diff = current['disk_used'] - baseline['disk_used']
+percent_change = (diff / baseline['disk_used']) * 100 if baseline['disk_used'] > 0 else 0
+⋮----
+status = f"[yellow]WARNING (+{int(percent_change)}%)[/yellow]"
+⋮----
+status = "[green]Stable[/green]"
+⋮----
+pkg_diff = current['packages'] - baseline['packages']
+⋮----
+status = f"[yellow]MODIFIED ({pkg_diff:+d})[/yellow]"
+⋮----
+status = "[green]Match[/green]"
+</file>
+
+<file path="guard.py">
+console = Console()
+SETTINGS_FILE = "settings.json"
+LOCKDOWN_FILE = "lockdown.mode"
+⋮----
+WARNED_CACHE = set()
+⋮----
+def load_settings()
+⋮----
+settings = {"mode": "manual", "whitelist": [], "enable_desktop_notifications": True}
+⋮----
+settings = json.load(f)
+⋮----
+def is_safe_system_process(proc)
+⋮----
+name = proc.info['name'].lower()
+kernel_prefixes = [
+⋮----
+safe_apps = ["gnome", "snapd", "packagekit", "polkit", "accounts-daemon"]
+⋮----
+def check_processes()
+⋮----
+settings = load_settings()
+whitelist = [p.lower() for p in settings.get("whitelist", [])]
+mode = settings.get("mode", "manual")
+rogues = []
+⋮----
+p_name = proc.info['name'].lower()
+⋮----
+def enforce_rules(rogues)
+⋮----
+p_name = proc.info['name']
+⋮----
+msg = f"Terminated Hostile Process: {p_name}"
+⋮----
+msg = f"Unknown process detected: {p_name}"
+</file>
+
+<file path="gym.py">
+console = Console()
+⋮----
+SCENARIOS = {
+⋮----
+def start_gym()
+⋮----
+choice = Prompt.ask("Choose Level", choices=list(SCENARIOS.keys()), default="1")
+level = SCENARIOS[choice]
+⋮----
+user_query = Prompt.ask("[bold cyan]Describe the problem (or type 'exit')[/bold cyan]")
+⋮----
+fake_context = {"os": "Ubuntu Simulator", "logs": level['error_log']}
+⋮----
+response = brain.ask_nova(fake_context, user_query, learning_mode=True)
+</file>
+
+<file path="history.py">
+LOG_FILE = "sentinel_history.json"
+console = Console()
+⋮----
+def save_event(problem, solution, fix_cmd, backup_cmd, auditor_status, status)
+⋮----
+entry = {
+history = load_history()
+⋮----
+def load_history()
+⋮----
+backup_name = LOG_FILE + ".corrupted"
+⋮----
+def check_recurrence(current_problem)
+⋮----
+data = load_history()
+⋮----
+words_a = set(current_problem.lower().split())
+words_b = set(entry["problem"].lower().split())
+⋮----
+def is_system_looping(problem, limit=3, window_minutes=5)
+⋮----
+recent_fixes = 0
+now = datetime.now()
+⋮----
+entry_time = datetime.strptime(entry["timestamp"], "%Y-%m-%d %H:%M:%S")
+⋮----
+def generate_report()
+⋮----
+total = len(data)
+successful = len([e for e in data if e["final_status"] in ["EXECUTED", "USER_CORRECTED", "AUTO_EXECUTED"]])
+blocked = len([e for e in data if e["final_status"] == "BLOCKED"])
+corrected = len([e for e in data if e.get("user_feedback")])
+accuracy = int((successful / total) * 100) if total > 0 else 0
+health = "Stable"
+if blocked > 3: health = "Critical (High Security Blocks)"
+⋮----
+def view_history()
+⋮----
+table = Table(title="Audit Log")
+⋮----
+def enter_teach_mode()
+⋮----
+choice = Prompt.ask("Enter ID to correct (or 'q')", default="q")
+⋮----
+idx = int(choice)
+real_idx = len(data) - 10 + idx if len(data) > 10 else idx
+entry = data[real_idx]
+</file>
+
+<file path="hooks_engine.py">
+console = Console()
+HOOKS_DIR = "hooks"
+⋮----
+def check_and_run_hooks(error_message)
+⋮----
+executed = False
+error_words = set(error_message.lower().split())
+⋮----
+keyword = script.split('_')[0].lower()
+⋮----
+script_path = os.path.join(HOOKS_DIR, script)
+⋮----
+# Run the script
+result = subprocess.run([f"./{script_path}"], shell=True, capture_output=True, text=True)
+⋮----
+executed = True
+</file>
+
+<file path="install.sh">
+echo "🚀 Initiating StackSentinel Installation..."
+APP_DIR=$(pwd)
+echo "📦 Setting up Python Virtual Environment..."
+python3 -m venv venv
+source venv/bin/activate
+echo "🔊 Installing Linux Audio Dependencies..."
+sudo apt-get update && sudo apt-get install -y espeak alsa-utils
+echo "📥 Installing dependencies and native CLI tools..."
+pip install -r requirements.txt
+pip install .
+echo "🔗 Linking commands to global system path..."
+sudo ln -sf "$APP_DIR/venv/bin/stacksentinel" /usr/local/bin/stacksentinel
+sudo ln -sf "$APP_DIR/venv/bin/stacksentinel-ui" /usr/local/bin/stacksentinel-ui
+echo "✅ Installation Complete!"
+echo "------------------------------------------------------"
+echo "🛡️  StackSentinel is now installed as a native global app."
+echo "💻 You can now safely open a new terminal and run 'stacksentinel'."
+echo "------------------------------------------------------"
+</file>
+
+<file path="README.md">
+# 🛡️ StackSentinel
+
+**An Autonomous, Self-Healing Linux Infrastructure Agent powered by Amazon Nova.**
+
+## 📑 Index
+
+1. [Overview](https://www.google.com/search?q=%23-overview)
+2. [Key Features](https://www.google.com/search?q=%23-key-features)
+3. [Installation & Setup](https://www.google.com/search?q=%23-installation--setup)
+4. [Usage Guide](https://www.google.com/search?q=%23-usage-guide)
+5. [Full CLI Command Reference](https://www.google.com/search?q=%23-full-cli-command-reference)
+6. [Teardown & Uninstallation](https://www.google.com/search?q=%23-teardown--uninstallation)
+7. [License](https://www.google.com/search?q=%23-license)
+
+## 🚀 Overview
+
+System administrators cannot monitor terminal outputs 24/7. **StackSentinel** is a lightweight, edge-deployed AI watchdog that actively monitors Linux system logs, diagnoses critical hardware and software faults in real-time, and securely executes autonomous bash commands to heal the system before a total crash occurs.
+
+Coupled with a mobile-responsive Command and Control (C2) dashboard, admins get live system telemetry and remote lockdown capabilities right from their phones.
+
+## ✨ Key Features
+
+* **🧠 LLM-Powered Remediation:** Integrates with AWS Bedrock (Amazon Nova) to diagnose raw system logs and generate precise bash fixes.
+* **🛡️ Execution Safety Net:** A multi-layered guardrail system that intercepts AI-generated scripts to block destructive commands (like `rm -rf` or `mkfs`) and enforces 15-second execution timeouts.
+* **🔒 Command Auditor:** An additional logic layer that cross-references suggested fixes against system security policies.
+* **⚡ Crash-Proof IPC:** Engineered with atomic JSON file writes and global `0o666` permissions to ensure seamless communication between the Root Watchdog and the User-level C2 Dashboard.
+* **🌐 Auto-Tunneling C2:** Integrated `pyngrok` support that automatically generates a public URL for your dashboard on startup.
+
+## 💻 Installation & Setup
+
+Developed and stress-tested on Ubuntu Linux. We provide an automated installation script that sets up the Python virtual environment and installs the StackSentinel global CLI tools.
+
+**1. Clone & Navigate**
+
+```bash
+git clone https://github.com/AadithyaAle/StackSentinel.git
+cd StackSentinel
+
+```
+
+**2. Run the Installer**
+
+```bash
+chmod +x install.sh uninstall.sh
+./install.sh
+
+```
+
+**3. AWS Authentication**
+Ensure you are logged into your secure AWS profile:
+
+```bash
+aws sso login --profile Stack-Sentinel
+
+```
+
+**4. Ngrok Authentication (For the Web UI)**
+To use the automated public dashboard tunnel, you must link your free Ngrok account:
+
+```bash
+ngrok config add-authtoken YOUR_NGROK_TOKEN
+
+```
+
+## 🎮 Usage Guide
+
+Thanks to the automated CLI setup, you can run StackSentinel from **any** terminal directory on your machine.
+
+> [!IMPORTANT]
+> **Environment Preservation:** To allow the AI to fix system-level issues while maintaining access to your AWS credentials, you must use the `-E` flag with `sudo`.
+
+**Step 1: Start the Web Dashboard**
+Open any terminal and run:
+
+```bash
+stacksentinel-ui
+
+```
+
+*The public Ngrok URL will be printed directly in your terminal so you can open it on your phone.*
+
+**Mode A: Autonomous Healing (Recommended)**
+To allow the AI to fix system-level issues while maintaining access to your AWS credentials, use the `-E` flag. This preserves your environment variables so the AI can "think" while having the power to "act."
+
+```bash
+sudo -E stacksentinel --watchdog
+
+```
+
+**Mode B: Standard/Read-Only Mode**
+If you prefer not to grant root access, you can run the agent as a standard user.
+*Note: The AI will still diagnose errors, but it may fail to execute fixes that require administrative permissions (like restarting services).*
+
+```bash
+stacksentinel --watchdog
+
+```
+
+**Step 3: Test the Auto-Healing (Simulation)**
+To safely test the AI's execution capabilities, open a third terminal and inject a harmless missing-directory error into the log file: 
+
+```bash
+echo "CRITICAL: Backup service failed." >> /tmp/stacksentinel_dummy_log.txt
+
+```
+
+Watch your terminal or phone dashboard as the AI intercepts the log, consults Amazon Nova, audits the `mkdir` command for safety, and physically creates the directory on your machine. 
+
+## 🧰 Full CLI Command Reference
+
+StackSentinel is highly modular. You can use it as a passive monitor, an active guardian, or an interactive educational tool. 
+
+| Command | Description |
+| --- | --- |
+| `stacksentinel "error"` | **Standard Mode:** Manually ask the AI to diagnose a specific error. |
+| `sudo -E stacksentinel --watchdog` | **Active Defense:** Runs the continuous AFK protection and auto-healing loop. |
+| `stacksentinel --watch` | **Passive Defense:** Monitors logs without executing fixes. |
+| `stacksentinel --gym` | **Training:** Enter the interactive threat-response training simulator. |
+| `stacksentinel --learn "error"` | **Professor Mode:** Explains Linux concepts before showing the fix. |
+| `stacksentinel --teach` | **Feedback:** Provide manual corrections to the AI. |
+| `stacksentinel --report` | **Analytics:** View the AI's success/failure performance score. |
+| `stacksentinel --history` | **Audit Trail:** View a color-coded log of every command executed. |
+| `stacksentinel --snapshot` | **Backups:** Create an instant JSON state backup of the system. |
+| `stacksentinel --restore` | **Rollback:** Revert to a previous system snapshot. |
+| `stacksentinel --set-baseline` | **Security:** Set a known-good configuration baseline. |
+| `stacksentinel --audit` | **Security:** Check for unauthorized configuration drift. |
+
+## 🗑️ Teardown & Uninstallation
+
+To completely remove the StackSentinel CLI tools and isolated virtual environment from your system, simply run the included uninstaller: 
+
+```bash
+./uninstall.sh
+
+```
+
+ ## 🤝 Open Source
+
+
+This project explores the intersection of AI inference and low-level systems engineering.
+
+
+---
+
+**License:** MIT
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "style": "xml",
+    "removeComments": true,
+    "removeEmptyLines": true,
+    "compress": true
+  },
+  "ignore": {
+    "customPatterns": [
+      "*.log",
+      "tests/**",
+      "node_modules/**",
+      "*.bin"
+    ]
+  }
+}
+</file>
+
+<file path="sentinel_profile.py">
+console = Console()
+PROFILE_FILE = "system_profile.json"
+⋮----
+LOG_FILES = [
+⋮----
+PATTERNS = {
+⋮----
+def scan_logs()
+⋮----
+found_issues = []
+⋮----
+cmd = ["tail", "-n", "2000", log_path]
+result = subprocess.run(cmd, capture_output=True, text=True)
+log_content = result.stdout
+⋮----
+def create_profile()
+⋮----
+"""
+    Runs the onboarding wizard.
+    """
+⋮----
+user_role = "Developer"
+⋮----
+chronic_issues = scan_logs()
+⋮----
+def save_profile(issues, role)
+⋮----
+data = {
+⋮----
+def load_profile()
+</file>
+
+<file path="server.py">
+app = Flask(__name__)
+⋮----
+STATUS_FILE = "/tmp/stacksentinel_status.json"
+LOCKDOWN_FILE = "/tmp/stacksentinel_lockdown.mode"
+⋮----
+HTML_TEMPLATE = """
+⋮----
+@app.route('/')
+def index()
+⋮----
+@app.route('/api/status')
+def status()
+⋮----
+@app.route('/api/lockdown', methods=['POST'])
+def lockdown()
+⋮----
+@app.route('/api/unlock', methods=['POST'])
+def unlock()
+⋮----
+"""Removes the lockdown file to return to normal watch mode."""
+⋮----
+def start_server()
+⋮----
+# Start the Ngrok tunnel to the Flask port automatically
+public_url = ngrok.connect(5000)
+</file>
+
+<file path="setup.py">
+
+</file>
+
+<file path="snapshot.py">
+console = Console()
+BACKUP_DIR = "sentinel_backups"
+CRITICAL_PATHS = [
+⋮----
+def cleanup_old_snapshots(keep=5)
+⋮----
+snapshots = []
+⋮----
+oldest = snapshots.pop(0)
+⋮----
+def create_snapshot(note="Manual Snapshot")
+⋮----
+timestamp = time.strftime("%Y%m%d-%H%M%S")
+filename = f"snapshot_{timestamp}.tar.gz"
+filepath = os.path.join(BACKUP_DIR, filename)
+⋮----
+def list_snapshots()
+⋮----
+note = "Auto-Backup"
+⋮----
+with open(os.path.join(BACKUP_DIR, f + ".meta"), "r") as mf: note = mf.read().strip()
+⋮----
+def restore_snapshot(filename)
+</file>
+
+<file path="test_voice.py">
+engine = pyttsx3.init()
+</file>
+
+<file path="uninstall.sh">
+echo "🗑️ Uninstalling StackSentinel..."
+sudo rm -f /usr/local/bin/stacksentinel
+sudo rm -f /usr/local/bin/stacksentinel-ui
+rm -rf venv
+echo "✅ Virtual environment and global CLI links safely removed."
+</file>
+
+<file path="voice.py">
+console = Console()
+⋮----
+def speak(text)
+</file>
+
+<file path="main.py">
+
+</file>
+
+</files>
