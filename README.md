@@ -17,6 +17,7 @@ StackSentinel is a local Linux repair assistant that watches logs, suggests safe
 - Python 3.10+
 - `pip`
 - `espeak` for optional voice alerts
+- `libnotify-bin` for desktop notifications
 - An `OPENAI_API_KEY` environment variable for live AI diagnosis
 
 ## Install

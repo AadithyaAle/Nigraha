@@ -6,10 +6,9 @@ cd "$SCRIPT_DIR"
 
 echo "🚀 Installing StackSentinel..."
 sudo apt-get update
-sudo apt-get install -y python3 python3-pip git espeak
+sudo apt-get install -y python3 python3-pip git espeak libnotify-bin
 
 echo "📥 Installing Python package globally..."
-sudo python3 -m pip install --upgrade pip --break-system-packages
 sudo python3 -m pip install . --break-system-packages
 
 echo "🔧 Marking built-in hooks as executable..."
