@@ -70,7 +70,7 @@ This project was built for **OpenAI Build Week** using **Codex** as the primary 
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/AadithyaAle/Nigraha
+git clone https://github.com/AadithyaAle/Nigraha Nigraha
 cd Nigraha
 ```
 
