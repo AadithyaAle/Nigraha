@@ -1,15 +1,16 @@
 # StackSentinel
 
-StackSentinel is a local Linux troubleshooting assistant. It collects a small
-system report, uses the OpenAI Responses API to suggest a safe repair command,
-and lets you decide whether to run that command.
+StackSentinel is a local troubleshooting assistant for Linux and Linux
+distributions running in Windows Subsystem for Linux (WSL). It collects a
+small system report, uses the OpenAI Responses API to suggest a safe repair
+command, and lets you decide whether to run that command.
 
 It also includes log monitoring, a local dashboard, system snapshots, and a
 safe alert-only watchdog mode.
 
 ## Features
 
-- Diagnose Linux problems from the terminal
+- Diagnose Linux and WSL problems from the terminal
 - Review and approve suggested commands before interactive execution
 - Display command output and errors after a command finishes
 - Monitor StackSentinel's log in passive watch mode
@@ -20,7 +21,7 @@ safe alert-only watchdog mode.
 
 ## Requirements
 
-- Linux
+- Linux, or a Linux distribution running in WSL 2
 - Python 3.10 or newer
 - `pip`
 - An OpenAI API key for online diagnosis
@@ -30,7 +31,7 @@ Optional desktop integrations:
 - `espeak` for voice alerts
 - `libnotify-bin` for desktop notifications
 
-## Installation
+## Installation on Linux
 
 Clone the repository and run the installer:
 
@@ -52,6 +53,46 @@ export OPENAI_API_KEY="your_api_key_here"
 
 To keep it across new terminals, add that command to your shell profile, such
 as `~/.bashrc` or `~/.zshrc`.
+
+## Installation on WSL
+
+StackSentinel runs inside a WSL Linux distribution, such as Ubuntu. Native
+Windows is not supported; run the following commands in the WSL terminal.
+
+If WSL is not installed yet, open **Windows PowerShell as Administrator** and
+run:
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Restart Windows if prompted, then open the Ubuntu app and complete its first
+time user setup. Inside the Ubuntu/WSL terminal, install StackSentinel:
+
+```bash
+sudo apt update
+sudo apt install -y git
+git clone https://github.com/AadithyaAle/Nigraha.git
+cd Nigraha
+sudo ./install.sh
+```
+# If install.sh fails with Python environment errors, try:
+sudo pip install --break-system-packages -e .
+
+Set the API key in that WSL terminal:
+
+```bash
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+The same `stacksentinel` commands work in native Linux and WSL. On WSL,
+hardware reports and repair commands apply to the WSL Linux environment, not
+directly to Windows hardware or Windows services.
+
+> **WSL limitation:** Bluetooth and other physical-device repair features
+> usually need native Linux because WSL does not normally expose Windows
+> hardware directly. Desktop notifications and voice alerts in WSL depend on
+> your WSLg/desktop integration.
 
 ## Usage
 
@@ -94,8 +135,9 @@ stacksentinel --watchdog
 ```
 
 Watchdog is alert-only. It does not terminate processes, so it will not end
-your desktop session. If an internal watchdog error occurs, it displays the
-error and automatically falls back to passive log watching.
+your Linux desktop session. In WSL it monitors only WSL processes. If an
+internal watchdog error occurs, it displays the error and automatically falls
+back to passive log watching.
 
 Start the dashboard:
 
@@ -105,6 +147,8 @@ stacksentinel-ui
 
 Open <http://127.0.0.1:5000> in your browser. The dashboard stays local by
 default and shows live CPU/RAM data plus recent StackSentinel log activity.
+When running in WSL, open the same address from Windows; WSL normally forwards
+it to your Windows browser automatically.
 
 ## Safety
 
@@ -162,4 +206,3 @@ This removes the global package. Your local data in
 ## License
 
 StackSentinel is licensed under the [Apache License 2.0](LICENSE).
-
