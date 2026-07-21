@@ -15,6 +15,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+from rich.text import Text
 
 import auth
 import brain
@@ -138,6 +139,36 @@ def run_fix_command(command):
     return result
 
 
+def show_command_result(result):
+    """Show captured stdout/stderr after a command has completed."""
+    sections = []
+    if result.stdout.strip():
+        sections.append(f"STDOUT\n{result.stdout.strip()}")
+    if result.stderr.strip():
+        sections.append(f"STDERR\n{result.stderr.strip()}")
+
+    output = "\n\n".join(sections) or "Command completed successfully with no terminal output."
+    max_output_length = 6000
+    if len(output) > max_output_length:
+        output = (
+            f"… output shortened; showing the last {max_output_length} characters …\n\n"
+            f"{output[-max_output_length:]}"
+        )
+
+    succeeded = result.returncode == 0
+    console.print(
+        Panel(
+            Text(output),
+            title=(
+                f"Command completed (exit code {result.returncode})"
+                if succeeded
+                else f"Command failed (exit code {result.returncode})"
+            ),
+            border_style="green" if succeeded else "red",
+        )
+    )
+
+
 def start_watchdog_mode(log_file=str(DEFAULT_LOG_FILE)):
     ensure_app_dirs()
     console.clear()
@@ -253,12 +284,11 @@ def start_watchdog_mode(log_file=str(DEFAULT_LOG_FILE)):
                             result = run_fix_command(fix)
                             if result.returncode == 0:
                                 console.print(f"[bold cyan]Command Executed: {fix}[/bold cyan]")
+                                show_command_result(result)
                                 history_status = "AUTO_EXECUTED"
                                 current_ai_log = f"✅ FIXED: {fix}"
                             else:
-                                console.print(
-                                    f"[bold red]Command failed ({result.returncode}).[/bold red]\n{result.stderr}"
-                                )
+                                show_command_result(result)
                                 history_status = "FAILED"
                                 current_ai_log = f"❌ FAILED: {fix}"
                         except subprocess.TimeoutExpired:
@@ -421,7 +451,7 @@ def cli_entry_point():
                 "SAFE",
                 status,
             )
-            console.print("[green]Trusted fix executed.[/green]" if status == "EXECUTED" else "[red]Trusted fix failed.[/red]")
+            show_command_result(result)
             return
         console.print(f"[red]{audit}[/red]")
 
@@ -452,16 +482,10 @@ def cli_entry_point():
                 try:
                     result = run_fix_command(cmds["fix"])
                     if result.returncode == 0:
-                        console.print("[green]Executed.[/green]")
+                        show_command_result(result)
                         status = "EXECUTED"
                     else:
-                        console.print(
-                            Panel(
-                                (result.stderr or result.stdout or "Unknown command failure.").strip(),
-                                title=f"Command failed ({result.returncode})",
-                                border_style="red",
-                            )
-                        )
+                        show_command_result(result)
                         status = "FAILED"
                 except subprocess.TimeoutExpired:
                     console.print(

@@ -79,7 +79,7 @@ def ask_openai(system_context, user_problem, learning_mode=False, user_profile=N
         response = client.responses.create(
             model=DEFAULT_MODEL,
             max_output_tokens=500,
-            reasoning={"effort": "minimal"},
+            reasoning={"effort": "low"},
             input=[
                 {
                     "role": "system",
