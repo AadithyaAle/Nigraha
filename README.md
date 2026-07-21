@@ -1,141 +1,165 @@
 # StackSentinel
 
-StackSentinel is a local Linux repair assistant that watches logs, suggests safe shell fixes, and can optionally auto-respond to recurring problems. It now uses the OpenAI Responses API for diagnosis.
+StackSentinel is a local Linux troubleshooting assistant. It collects a small
+system report, uses the OpenAI Responses API to suggest a safe repair command,
+and lets you decide whether to run that command.
 
-## What It Does
+It also includes log monitoring, a local dashboard, system snapshots, and a
+safe alert-only watchdog mode.
 
-- Monitors a log file in watch or watchdog mode
-- Diagnoses Linux issues with OpenAI
-- Audits generated commands before they can run
-- Stores history, snapshots, drift baselines, and profile data outside the repo
-- Offers a lightweight local dashboard with live CPU, RAM, and log data
-- Supports simple keyword-based recovery hooks such as Wi-Fi reset scripts
+## Features
+
+- Diagnose Linux problems from the terminal
+- Review and approve suggested commands before interactive execution
+- Display command output and errors after a command finishes
+- Monitor StackSentinel's log in passive watch mode
+- Use an alert-only watchdog with CPU, RAM, and process notifications
+- View live CPU, RAM, status, and recent logs in a local dashboard
+- Keep local history, snapshots, system profiles, and drift baselines
+- Run simple bundled recovery hooks, such as Wi-Fi recovery
 
 ## Requirements
 
 - Linux
-- Python 3.10+
+- Python 3.10 or newer
 - `pip`
-- `espeak` for optional voice alerts
+- An OpenAI API key for online diagnosis
+
+Optional desktop integrations:
+
+- `espeak` for voice alerts
 - `libnotify-bin` for desktop notifications
-- An `OPENAI_API_KEY` environment variable for live AI diagnosis
 
-## Install
+## Installation
 
-Clone the repo and run:
+Clone the repository and run the installer:
 
 ```bash
-git clone https://github.com/AadithyaAle/Nigraha Nigraha
+git clone https://github.com/AadithyaAle/Nigraha.git
 cd Nigraha
 sudo ./install.sh
 ```
 
-That script:
+The installer installs the required system packages, installs the
+`stacksentinel` and `stacksentinel-ui` commands, and makes bundled hooks
+executable. A virtual environment is not required for this installation path.
 
-- installs system packages with `apt`
-- installs StackSentinel globally with `pip`
-- marks the bundled hooks executable
-
-You do not need to manually create a `venv`, and you do not need to run `pip install -r requirements.txt` yourself for the normal install path.
-
-Then set your API key:
+Set your OpenAI API key in the current terminal:
 
 ```bash
 export OPENAI_API_KEY="your_api_key_here"
 ```
 
-If you want that to persist, add it to your shell profile such as `~/.bashrc`.
+To keep it across new terminals, add that command to your shell profile, such
+as `~/.bashrc` or `~/.zshrc`.
 
-## Quick Start
+## Usage
 
-Ask for a diagnosis:
-
-```bash
-stacksentinel "wifi keeps disconnecting after resume"
-```
-
-Run in educational mode:
+Ask StackSentinel to inspect a problem:
 
 ```bash
-stacksentinel --learn "python package install keeps failing"
+stacksentinel "Bluetooth is not connecting"
 ```
 
-Start passive log watching:
+When a repair command is suggested, StackSentinel audits it and asks for your
+approval. After it runs, it displays the command's standard output, error
+output, and exit code.
+
+Useful commands:
+
+```bash
+stacksentinel --help
+stacksentinel --learn "why is my Wi-Fi disconnecting?"
+stacksentinel --history
+stacksentinel --report
+stacksentinel --snapshot
+stacksentinel --restore
+stacksentinel --audit
+stacksentinel --set-baseline
+stacksentinel --gym
+```
+
+## Monitoring and Dashboard
+
+Start passive log monitoring:
 
 ```bash
 stacksentinel --watch
 ```
 
-Start full watchdog mode:
+Start watchdog monitoring:
 
 ```bash
 stacksentinel --watchdog
 ```
 
-Watchdog is alert-only: it never terminates processes. This avoids disrupting
-your Linux desktop session. If watchdog itself encounters an internal error,
-it reports the error and automatically falls back to passive log watching.
+Watchdog is alert-only. It does not terminate processes, so it will not end
+your desktop session. If an internal watchdog error occurs, it displays the
+error and automatically falls back to passive log watching.
 
-Open the local dashboard:
+Start the dashboard:
 
 ```bash
 stacksentinel-ui
 ```
 
-By default the dashboard stays local at `http://127.0.0.1:5000`.
+Open <http://127.0.0.1:5000> in your browser. The dashboard stays local by
+default and shows live CPU/RAM data plus recent StackSentinel log activity.
 
-## Command Safety
+## Safety
 
-StackSentinel does not blindly trust model output. It blocks:
+StackSentinel does not run arbitrary model output. Its command audit blocks:
 
-- shell chaining such as `&&`, `;`, pipes, and redirection
-- `sudo` execution
-- destructive patterns such as `rm -rf /`, `mkfs`, `dd if=/dev/zero`, `shutdown`, and `reboot`
-- commands outside a small allowlist used for basic Linux repair tasks
+- `sudo` commands
+- shell chaining, pipes, redirection, substitutions, and backticks
+- destructive commands such as filesystem formatting, rebooting, or deleting
+  the root filesystem
+- executables outside its allowlist
 
-For interactive CLI use, commands still require confirmation before they run.
+Interactive diagnoses always require confirmation before a suggested command
+runs. Watchdog actions are alert-only.
 
-## Data Storage
+## Configuration and Data
 
-Runtime data is stored in:
+Set a different OpenAI model if needed:
+
+```bash
+export STACKSENTINEL_MODEL="gpt-5.6-luna"
+```
+
+Without `OPENAI_API_KEY`, StackSentinel uses a safe offline placeholder
+diagnosis instead of contacting the API.
+
+Application data is stored outside the repository:
 
 ```text
 ~/.local/share/stacksentinel/
 ```
 
-That includes:
+This includes history, profiles, snapshots, and drift data. Temporary
+dashboard status files are stored in `/tmp`.
 
-- audit history
-- system profile
-- drift baseline
-- restore snapshots
-- local state exported for the dashboard
+## Updating
 
-Temporary live status and lockdown flags are kept in `/tmp`. The dashboard
-measures CPU/RAM and reads recent log lines directly, so it stays live even
-when watchdog is not running.
-
-## Common Commands
+From the repository directory:
 
 ```bash
-stacksentinel --history
-stacksentinel --report
-stacksentinel --teach
-stacksentinel --snapshot
-stacksentinel --restore
-stacksentinel --set-baseline
-stacksentinel --audit
-stacksentinel --gym
+git pull
+sudo -H python3 -m pip install --force-reinstall --no-deps . --break-system-packages
 ```
 
-## Notes
-
-- If `OPENAI_API_KEY` is missing, StackSentinel falls back to a safe offline placeholder response.
-- The default model is `gpt-5.6-luna`. You can override it with `STACKSENTINEL_MODEL`.
-- The built-in chaos generator writes to the same log location the watchdog reads.
-
 ## Uninstall
+
+Run:
 
 ```bash
 ./uninstall.sh
 ```
+
+This removes the global package. Your local data in
+`~/.local/share/stacksentinel/` is kept unless you remove it yourself.
+
+## License
+
+StackSentinel is licensed under the [Apache License 2.0](LICENSE).
+
