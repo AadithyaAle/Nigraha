@@ -8,7 +8,7 @@ StackSentinel is a local Linux repair assistant that watches logs, suggests safe
 - Diagnoses Linux issues with OpenAI
 - Audits generated commands before they can run
 - Stores history, snapshots, drift baselines, and profile data outside the repo
-- Offers a lightweight local dashboard for status and lockdown control
+- Offers a lightweight local dashboard with live CPU, RAM, and log data
 - Supports simple keyword-based recovery hooks such as Wi-Fi reset scripts
 
 ## Requirements
@@ -72,6 +72,10 @@ Start full watchdog mode:
 stacksentinel --watchdog
 ```
 
+Watchdog is alert-only: it never terminates processes. This avoids disrupting
+your Linux desktop session. If watchdog itself encounters an internal error,
+it reports the error and automatically falls back to passive log watching.
+
 Open the local dashboard:
 
 ```bash
@@ -107,7 +111,9 @@ That includes:
 - restore snapshots
 - local state exported for the dashboard
 
-Temporary live status and lockdown flags are kept in `/tmp`.
+Temporary live status and lockdown flags are kept in `/tmp`. The dashboard
+measures CPU/RAM and reads recent log lines directly, so it stays live even
+when watchdog is not running.
 
 ## Common Commands
 

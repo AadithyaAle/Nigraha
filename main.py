@@ -86,6 +86,47 @@ def cleanup_status_file():
         STATUS_FILE.unlink()
 
 
+def start_watchdog_with_fallback(log_file=str(DEFAULT_LOG_FILE)):
+    """Run watchdog and fall back to passive watching after an internal error.
+
+    A watchdog failure must never leave the terminal full of a Python traceback
+    or encourage the user to force-stop it.  The fallback performs no process
+    actions and keeps the recent log visible.
+    """
+    try:
+        start_watchdog_mode(log_file)
+    except KeyboardInterrupt:
+        cleanup_status_file()
+        console.print("\n[yellow]Watchdog disarmed by user.[/yellow]")
+    except Exception as exc:
+        error_summary = f"{type(exc).__name__}: {exc}"
+        broadcast_status("SAFE FALLBACK", 0, 0, error_summary)
+        console.print(
+            Panel(
+                "Watchdog encountered an internal error and has been switched "
+                "to passive log watching. No processes were stopped.\n\n"
+                f"[bold]Error:[/bold] {error_summary}",
+                title="Watchdog safe fallback",
+                border_style="yellow",
+            )
+        )
+        try:
+            start_watch_mode(log_file)
+        except KeyboardInterrupt:
+            cleanup_status_file()
+            console.print("\n[yellow]Passive watch stopped by user.[/yellow]")
+        except Exception as fallback_error:
+            fallback_summary = f"{type(fallback_error).__name__}: {fallback_error}"
+            broadcast_status("STOPPED", 0, 0, fallback_summary)
+            console.print(
+                Panel(
+                    f"Passive watch could not start.\n\n[bold]Error:[/bold] {fallback_summary}",
+                    title="Watchdog stopped safely",
+                    border_style="red",
+                )
+            )
+
+
 def run_fix_command(command):
     result = subprocess.run(
         shlex.split(command),
@@ -129,11 +170,11 @@ def start_watchdog_mode(log_file=str(DEFAULT_LOG_FILE)):
                 is_locked = LOCKDOWN_FILE.exists()
 
                 if is_locked and not was_locked:
-                    voice.speak("Lockdown protocol engaged. Eliminating threats.")
-                    console.print("[bold red]🔒 LOCKDOWN ACTIVATED REMOTELY[/bold red]")
+                    voice.speak("Lockdown protocol engaged. Alerts are elevated.")
+                    console.print("[bold red]🔒 LOCKDOWN ACTIVATED: alert-only mode[/bold red]")
                     notifier.send_alert(
                         "System Status",
-                        "Lockdown protocol engaged via remote control.",
+                        "Lockdown engaged. StackSentinel will alert but will not terminate processes.",
                         "critical",
                     )
                 elif not is_locked and was_locked:
@@ -319,7 +360,7 @@ def cli_entry_point():
         return
 
     if args.watchdog:
-        start_watchdog_mode()
+        start_watchdog_with_fallback()
         return
     if args.watch:
         start_watch_mode()

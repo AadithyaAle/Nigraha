@@ -1,9 +1,12 @@
 import json
 import os
+from collections import deque
+from pathlib import Path
 
 from flask import Flask, jsonify, render_template_string
+import psutil
 
-from app_paths import LOCKDOWN_FILE, STATUS_FILE, atomic_write_json
+from app_paths import DEFAULT_LOG_FILE, LOCKDOWN_FILE, STATUS_FILE, atomic_write_json
 
 app = Flask(__name__)
 
@@ -45,8 +48,8 @@ HTML_TEMPLATE = """
         <div class="log" id="ai-log">Monitoring system logs...</div>
     </div>
 
-    <button class="btn-red" onclick="triggerMode('lockdown')">🚨 INITIATE LOCKDOWN</button>
-    <button class="btn-gray" onclick="triggerMode('unlock')">🔓 DISENGAGE LOCKDOWN</button>
+    <button class="btn-red" onclick="triggerMode('lockdown')">🚨 ENABLE ALERT MODE</button>
+    <button class="btn-gray" onclick="triggerMode('unlock')">🔓 DISABLE ALERT MODE</button>
 
     <script>
         setInterval(() => {
@@ -89,13 +92,35 @@ def index():
 
 @app.route("/api/status")
 def status():
+    """Return current host vitals even when watchdog is not running."""
+    saved_status = {}
     try:
         if STATUS_FILE.exists():
             with open(STATUS_FILE, "r", encoding="utf-8") as handle:
-                return jsonify(json.load(handle))
-        return jsonify({"cpu": 0, "ram": 0, "status": "WAITING"})
+                saved_status = json.load(handle)
     except Exception:
-        return jsonify({"cpu": 0, "ram": 0, "status": "FILE_LOCKED"})
+        saved_status = {}
+
+    return jsonify(
+        {
+            "cpu": round(psutil.cpu_percent(interval=None), 1),
+            "ram": round(psutil.virtual_memory().percent, 1),
+            "status": saved_status.get(
+                "status", "🔒 LOCKDOWN" if LOCKDOWN_FILE.exists() else "ONLINE"
+            ),
+            "last_log": saved_status.get("last_log") or recent_log_lines(),
+        }
+    )
+
+
+def recent_log_lines(limit: int = 12) -> str:
+    """Read the recent watchdog log safely for dashboard display."""
+    try:
+        with Path(DEFAULT_LOG_FILE).open("r", encoding="utf-8", errors="replace") as handle:
+            lines = deque(handle, maxlen=limit)
+        return "".join(lines).strip() or "No log activity yet."
+    except OSError:
+        return "No log activity yet."
 
 
 @app.route("/api/lockdown", methods=["POST"])
@@ -103,7 +128,7 @@ def lockdown():
     try:
         atomic_write_json(LOCKDOWN_FILE, {"active": True}, mode=0o600)
         print("🚨 Dashboard: Lockdown file created.")
-        return jsonify({"message": "Lockdown engaged. Watchdog taking over."})
+        return jsonify({"message": "Lockdown engaged in alert-only mode. No processes will be terminated."})
     except Exception as exc:
         return jsonify({"message": f"Error: {exc}"})
 

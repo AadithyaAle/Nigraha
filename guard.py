@@ -12,7 +12,12 @@ WARNED_CACHE = set()
 
 
 def load_settings():
-    """Loads settings and escalates to automated mode when lockdown is active."""
+    """Load process-alert settings.
+
+    Lockdown is intentionally alert-only.  A desktop session contains many
+    user-owned helper processes, so terminating unknown user processes can
+    end the graphical session and log the user out.
+    """
     settings = {"mode": "manual", "whitelist": [], "enable_desktop_notifications": True}
     settings.update(read_json(SETTINGS_FILE, {}))
     if LOCKDOWN_FILE.exists():
@@ -83,8 +88,9 @@ def check_processes():
             if is_safe_system_process(proc):
                 continue
 
-            if mode != "automated":
-                WARNED_CACHE.add(process_name)
+            # Alert once per process name; lockdown must not flood desktop
+            # notifications every watchdog tick.
+            WARNED_CACHE.add(process_name)
 
             rogues.append(proc)
         except Exception:
@@ -93,23 +99,17 @@ def check_processes():
 
 
 def enforce_rules(rogues):
-    settings = load_settings()
-    mode = settings.get("mode", "manual")
+    """Report unknown processes without modifying the user's system.
 
+    This function used to terminate every non-whitelisted user process while
+    in automated mode.  That policy was too broad and could kill session
+    components such as a panel, window manager helper, or shell.
+    """
     for proc in rogues:
         try:
             process_name = proc.info["name"]
-
-            if mode == "automated":
-                if proc.is_running():
-                    proc.terminate()
-                    msg = f"Terminated Hostile Process: {process_name}"
-                    console.print(f"[bold red]⚔️  LOCKDOWN KILLED:[/bold red] {process_name}")
-                    notifier.send_alert("Lockdown Action", msg, "critical")
-
-            elif mode == "intended":
-                msg = f"Unknown process detected: {process_name}"
-                console.print(f"[yellow]⚠️  Suspicious Process:[/yellow] {process_name}")
-                notifier.send_alert("Guard Alert", msg, "normal")
+            msg = f"Unknown user process detected: {process_name} (PID {proc.pid})"
+            console.print(f"[yellow]⚠️  Process alert:[/yellow] {process_name} (PID {proc.pid})")
+            notifier.send_alert("StackSentinel process alert", msg, "normal")
         except Exception:
             pass
